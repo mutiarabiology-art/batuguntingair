@@ -1,0 +1,1361 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kuiz Biologi T4 (Bab 7-15) - Batu Air Gunting</title>
+    <!-- Tailwind CSS untuk penggayaan moden dan responsif -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter & Fredoka untuk sentuhan permainan yang ceria -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Tone.js untuk muzik ceria 5 saat dan kesan bunyi tanpa pautan luar -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- MediaPipe Hands & Camera Utils untuk pengecaman isyarat tangan langsung -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at top left, #0f172a, #1e1b4b, #090d16);
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+        .font-game {
+            font-family: 'Fredoka', sans-serif;
+        }
+        /* Animasi denyutan dan pop untuk interaksi permainan */
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            70% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop {
+            animation: popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 15px rgba(56, 189, 248, 0.4); }
+            50% { box-shadow: 0 0 30px rgba(56, 189, 248, 0.8); }
+        }
+        .glow-p1 {
+            box-shadow: 0 0 25px rgba(59, 130, 246, 0.45);
+            border-color: #3b82f6;
+        }
+        .glow-p2 {
+            box-shadow: 0 0 25px rgba(244, 63, 94, 0.45);
+            border-color: #f43f5e;
+        }
+        /* Cerminkan video supaya gerakan tangan terasa semula jadi seperti cermin */
+        .mirror-canvas {
+            transform: scaleX(-1);
+        }
+        /* Butang gaya permainan dengan bayang 3D */
+        .btn-game {
+            transition: all 0.15s ease;
+            box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
+        }
+        .btn-game:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-emerald-500 selection:text-white">
+
+    <!-- BAR NAVIGASI / HEADER ATAS -->
+    <header class="w-full bg-slate-900/80 backdrop-blur-md border-b border-slate-800 px-4 py-3 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-2xl shadow-lg">
+                    🧬
+                </div>
+                <div>
+                    <h1 class="font-game text-lg sm:text-xl font-bold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-teal-200 to-cyan-300">
+                        BIO-ARENA KSSM T4
+                    </h1>
+                    <p class="text-xs text-slate-400">Bab 7 – Bab 15 • Batu Air Gunting & Kuiz MCQ</p>
+                </div>
+            </div>
+
+            <!-- Paparan Skor & Kawalan Audio -->
+            <div class="flex items-center gap-3 sm:gap-6">
+                <div class="flex items-center gap-2 bg-blue-950/70 border border-blue-700/50 px-3 py-1.5 rounded-xl">
+                    <span class="w-2.5 h-2.5 rounded-full bg-blue-400 animate-pulse"></span>
+                    <span id="header-p1-name" class="text-xs sm:text-sm font-semibold text-blue-200 truncate max-w-[90px]">Pemain 1</span>
+                    <span id="header-p1-score" class="font-game text-base sm:text-lg font-bold text-white bg-blue-600 px-2 py-0.5 rounded-lg">0</span>
+                </div>
+
+                <div class="text-slate-500 font-game font-bold text-sm">VS</div>
+
+                <div class="flex items-center gap-2 bg-rose-950/70 border border-rose-700/50 px-3 py-1.5 rounded-xl">
+                    <span id="header-p2-score" class="font-game text-base sm:text-lg font-bold text-white bg-rose-600 px-2 py-0.5 rounded-lg">0</span>
+                    <span id="header-p2-name" class="text-xs sm:text-sm font-semibold text-rose-200 truncate max-w-[90px]">Pemain 2</span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-rose-400 animate-pulse"></span>
+                </div>
+
+                <button id="btn-toggle-sound" onclick="toggleAudio()" title="Tukar Status Audio" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-emerald-400 transition">
+                    🔊
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- KANDUNGAN UTAMA -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 flex flex-col justify-center">
+
+        <!-- 1. SKRIN PENDAFTARAN PEMAIN & PILIHAN KAMERA -->
+        <section id="screen-setup" class="max-w-2xl mx-auto w-full bg-slate-900/90 border border-slate-700/80 rounded-3xl p-6 sm:p-8 shadow-2xl animate-pop">
+            <div class="text-center mb-6">
+                <span class="inline-block px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold mb-2 border border-emerald-500/30">
+                    BIOLOGI KSSM TINGKATAN 4 (BAB 7 – 15)
+                </span>
+                <h2 class="font-game text-2xl sm:text-3xl font-bold text-white mb-2">
+                    Pertarungan Batu, Air, Gunting!
+                </h2>
+                <p class="text-sm text-slate-300">
+                    Menangi pusingan <strong>Batu, Air, Gunting</strong> menggunakan kamera web atau butang manual untuk mendapat hak menjawab soalan Biologi dalam masa <strong>120 saat</strong>!
+                </p>
+            </div>
+
+            <!-- Input Nama Pemain -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                <div class="bg-blue-950/40 border border-blue-800/60 p-4 rounded-2xl">
+                    <label class="block text-xs font-bold uppercase tracking-wider text-blue-300 mb-1.5">
+                        Nama Pemain 1 (Kiri)
+                    </label>
+                    <input type="text" id="input-p1-name" value="Aiman" maxlength="15" placeholder="Masukkan nama..."
+                        class="w-full bg-slate-950/80 border border-blue-700/50 rounded-xl px-3.5 py-2.5 text-white font-semibold focus:outline-none focus:border-blue-400">
+                </div>
+
+                <div class="bg-rose-950/40 border border-rose-800/60 p-4 rounded-2xl">
+                    <label class="block text-xs font-bold uppercase tracking-wider text-rose-300 mb-1.5">
+                        Nama Pemain 2 (Kanan)
+                    </label>
+                    <input type="text" id="input-p2-name" value="Siti" maxlength="15" placeholder="Masukkan nama..."
+                        class="w-full bg-slate-950/80 border border-rose-700/50 rounded-xl px-3.5 py-2.5 text-white font-semibold focus:outline-none focus:border-rose-400">
+                </div>
+            </div>
+
+            <!-- Panduan Isyarat Tangan -->
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 mb-6">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 text-center">Panduan Isyarat Tangan MediaPipe & Peraturan</h3>
+                <div class="grid grid-cols-3 gap-2 text-center">
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/50">
+                        <div class="text-3xl mb-1">✊</div>
+                        <div class="font-game font-bold text-amber-300 text-sm">BATU</div>
+                        <div class="text-[11px] text-slate-400">Genggam tangan<br>(Kalahkan Gunting)</div>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/50">
+                        <div class="text-3xl mb-1">✋</div>
+                        <div class="font-game font-bold text-cyan-300 text-sm">AIR / KERTAS</div>
+                        <div class="text-[11px] text-slate-400">Buka 5 jari<br>(Kalahkan Batu)</div>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/50">
+                        <div class="text-3xl mb-1">✌️</div>
+                        <div class="font-game font-bold text-pink-300 text-sm">GUNTING</div>
+                        <div class="text-[11px] text-slate-400">2 jari (V)<br>(Kalahkan Air)</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Butang Mula -->
+            <div class="flex flex-col sm:flex-row gap-3">
+                <button onclick="startGame(true)" class="btn-game flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-game font-bold text-base sm:text-lg py-3.5 px-6 rounded-2xl flex items-center justify-center gap-2">
+                    <span>📷</span> Mula Dengan Kamera Web
+                </button>
+                <button onclick="startGame(false)" class="btn-game bg-slate-700 hover:bg-slate-600 text-slate-100 font-game font-semibold text-sm sm:text-base py-3.5 px-5 rounded-2xl flex items-center justify-center gap-2">
+                    <span>🎮</span> Mod Butang Manual
+                </button>
+            </div>
+            <p id="camera-status-msg" class="text-center text-xs text-slate-400 mt-3">
+                Nota: Jika kamera tidak ditemui atau disekat, aplikasi akan beralih ke butang manual secara automatik.
+            </p>
+        </section>
+
+        <!-- 2. SKRIN ARENA BATU AIR GUNTING (KAMERA BELAH DUA & MANUAL) -->
+        <section id="screen-rps" class="hidden w-full flex flex-col gap-4 animate-pop">
+            <!-- Status Pusingan & Pengumuman -->
+            <div class="bg-slate-900/90 border border-slate-700/80 rounded-2xl p-4 text-center shadow-lg relative overflow-hidden">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+                    <span id="question-counter-badge" class="px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-xs font-bold">
+                        Soalan 1 / 20
+                    </span>
+                    <span id="mediapipe-badge" class="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-semibold">
+                        🤖 Pengecaman Tangan Sedia
+                    </span>
+                </div>
+                <h2 id="rps-announcement" class="font-game text-2xl sm:text-4xl font-bold text-white my-1">
+                    Sedia untuk Batu, Air, Gunting!
+                </h2>
+                <p id="rps-subtext" class="text-xs sm:text-sm text-slate-300">
+                    Tunjukkan isyarat tangan anda di bahagian kamera masing-masing atau pilih butang di bawah.
+                </p>
+            </div>
+
+            <!-- Paparan Belah Dua (Split Screen: Pemain 1 Kiri | Pemain 2 Kanan) -->
+            <div class="relative w-full bg-slate-950 border-2 border-slate-700 rounded-3xl overflow-hidden shadow-2xl">
+                <!-- Video Tersembunyi & Kanvas Belah Dua Responsif -->
+                <video id="webcam-video" class="hidden" playsinline autoplay muted></video>
+                <div id="canvas-wrapper" class="relative w-full aspect-[16/9] max-h-[430px] bg-slate-900 flex items-center justify-center">
+                    <canvas id="split-canvas" class="w-full h-full object-cover mirror-canvas"></canvas>
+
+                    <!-- Garis Pemisah Tengah Belah Dua -->
+                    <div class="absolute inset-y-0 left-1/2 w-1 bg-gradient-to-b from-blue-500 via-white to-rose-500 -translate-x-1/2 pointer-events-none opacity-80"></div>
+                    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-900/90 border-2 border-white/30 text-white font-game font-bold text-xs sm:text-sm px-3 py-1.5 rounded-full shadow-xl pointer-events-none">
+                        VS
+                    </div>
+
+                    <!-- Tindanan Status Pemain 1 (Kiri) -->
+                    <div class="absolute top-3 left-3 bg-blue-950/85 backdrop-blur-md border border-blue-500/50 rounded-2xl px-3.5 py-2 pointer-events-none">
+                        <div class="text-[11px] font-bold text-blue-300 uppercase">PEMAIN 1 (KIRI)</div>
+                        <div id="p1-hud-name" class="font-game font-bold text-white text-sm sm:text-base">Aiman</div>
+                        <div id="p1-detected-label" class="mt-1 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-blue-600/40 text-blue-100 text-xs font-semibold">
+                            <span>⏳</span> Menunggu isyarat...
+                        </div>
+                    </div>
+
+                    <!-- Tindanan Status Pemain 2 (Kanan) -->
+                    <div class="absolute top-3 right-3 bg-rose-950/85 backdrop-blur-md border border-rose-500/50 rounded-2xl px-3.5 py-2 text-right pointer-events-none">
+                        <div class="text-[11px] font-bold text-rose-300 uppercase">PEMAIN 2 (KANAN)</div>
+                        <div id="p2-hud-name" class="font-game font-bold text-white text-sm sm:text-base">Siti</div>
+                        <div id="p2-detected-label" class="mt-1 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-rose-600/40 text-rose-100 text-xs font-semibold">
+                            <span>⏳</span> Menunggu isyarat...
+                        </div>
+                    </div>
+
+                    <!-- Kiraan Detik Besar di Tengah -->
+                    <div id="countdown-overlay" class="hidden absolute inset-0 bg-slate-950/45 backdrop-blur-[2px] flex items-center justify-center pointer-events-none">
+                        <div id="countdown-number" class="font-game text-7xl sm:text-9xl font-extrabold text-amber-300 drop-shadow-[0_5px_25px_rgba(251,191,36,0.8)] animate-bounce">
+                            3
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Kawalan Butang Kiraan & Butang Sokongan Manual -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-center">
+                <!-- Butang Manual Pemain 1 -->
+                <div class="bg-blue-950/50 border border-blue-800/60 rounded-2xl p-3">
+                    <div class="text-xs font-bold text-blue-300 mb-2 text-center">Pilihan Manual Pemain 1 (<span class="p1-name-span">Aiman</span>)</div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="setManualMove(1, 'BATU')" class="btn-game bg-blue-800 hover:bg-blue-700 text-white py-2.5 px-2 rounded-xl font-game text-xs sm:text-sm flex flex-col items-center">
+                            <span class="text-xl">✊</span> Batu
+                        </button>
+                        <button onclick="setManualMove(1, 'AIR')" class="btn-game bg-blue-800 hover:bg-blue-700 text-white py-2.5 px-2 rounded-xl font-game text-xs sm:text-sm flex flex-col items-center">
+                            <span class="text-xl">✋</span> Air
+                        </button>
+                        <button onclick="setManualMove(1, 'GUNTING')" class="btn-game bg-blue-800 hover:bg-blue-700 text-white py-2.5 px-2 rounded-xl font-game text-xs sm:text-sm flex flex-col items-center">
+                            <span class="text-xl">✌️</span> Gunting
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Butang Mula Kiraan Pusingan -->
+                <div class="flex flex-col items-center justify-center gap-2">
+                    <button id="btn-trigger-round" onclick="triggerRPSRound()" class="btn-game w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950 font-game font-extrabold text-base sm:text-lg shadow-xl">
+                        ⚡ MULA KIRAAN (3, 2, 1!)
+                    </button>
+                    <p class="text-[11px] text-slate-400 text-center">
+                        Tekan butang di atas untuk mengunci isyarat tangan kamera atau pilihan manual.
+                    </p>
+                </div>
+
+                <!-- Butang Manual Pemain 2 -->
+                <div class="bg-rose-950/50 border border-rose-800/60 rounded-2xl p-3">
+                    <div class="text-xs font-bold text-rose-300 mb-2 text-center">Pilihan Manual Pemain 2 (<span class="p2-name-span">Siti</span>)</div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="setManualMove(2, 'BATU')" class="btn-game bg-rose-800 hover:bg-rose-700 text-white py-2.5 px-2 rounded-xl font-game text-xs sm:text-sm flex flex-col items-center">
+                            <span class="text-xl">✊</span> Batu
+                        </button>
+                        <button onclick="setManualMove(2, 'AIR')" class="btn-game bg-rose-800 hover:bg-rose-700 text-white py-2.5 px-2 rounded-xl font-game text-xs sm:text-sm flex flex-col items-center">
+                            <span class="text-xl">✋</span> Air
+                        </button>
+                        <button onclick="setManualMove(2, 'GUNTING')" class="btn-game bg-rose-800 hover:bg-rose-700 text-white py-2.5 px-2 rounded-xl font-game text-xs sm:text-sm flex flex-col items-center">
+                            <span class="text-xl">✌️</span> Gunting
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. SKRIN SOALAN MCQ BIOLOGI (120 SAAT UNTUK PEMENANG) -->
+        <section id="screen-quiz" class="hidden max-w-4xl mx-auto w-full animate-pop">
+            <div id="quiz-card" class="bg-slate-900/95 border-2 border-emerald-500/60 rounded-3xl p-5 sm:p-8 shadow-2xl">
+                <!-- Bar Atas Kuiz: Nama Pemenang & Pemasa 120 Saat -->
+                <div class="flex flex-wrap items-center justify-between gap-4 pb-5 mb-6 border-b border-slate-800">
+                    <div class="flex items-center gap-3">
+                        <div id="winner-avatar" class="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400 flex items-center justify-center text-2xl">
+                            🏆
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold uppercase tracking-wider text-emerald-400">Giliran Menjawab (Pemenang)</div>
+                            <h3 id="quiz-winner-name" class="font-game text-xl sm:text-2xl font-bold text-white">Pemain 1</h3>
+                        </div>
+                    </div>
+
+                    <!-- Pemasa 120 Saat -->
+                    <div class="flex items-center gap-3 bg-slate-950 border border-slate-700 px-4 py-2.5 rounded-2xl">
+                        <span class="text-xl">⏱️</span>
+                        <div>
+                            <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Masa Tinggal</div>
+                            <div id="quiz-timer" class="font-game text-2xl font-extrabold text-amber-400">120s</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tag Bab & Nombor Soalan -->
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <span id="quiz-bab-badge" class="px-3 py-1 rounded-full bg-teal-500/20 border border-teal-500/40 text-teal-300 text-xs font-bold">
+                        Bab 7: Respirasi Sel
+                    </span>
+                    <span id="quiz-progress-text" class="text-xs font-semibold text-slate-400">
+                        Soalan 1 daripada 20
+                    </span>
+                </div>
+
+                <!-- Teks Soalan -->
+                <h2 id="quiz-question-text" class="text-lg sm:text-xl font-bold text-white leading-relaxed mb-6">
+                    Memuatkan soalan Biologi KSSM Tingkatan 4...
+                </h2>
+
+                <!-- Pilihan Jawapan A, B, C, D -->
+                <div id="quiz-options-grid" class="grid grid-cols-1 md:grid-cols-2 gap-3.5 mb-6">
+                    <!-- Dijana secara dinamik oleh JavaScript -->
+                </div>
+
+                <!-- Maklum Balas & Status Muzik Ceria 5 Saat -->
+                <div id="quiz-feedback-box" class="hidden rounded-2xl p-4 border mb-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <h4 id="feedback-title" class="font-game font-bold text-lg"></h4>
+                            <p id="feedback-explanation" class="text-xs sm:text-sm mt-1 opacity-90"></p>
+                        </div>
+                        <div id="music-playing-indicator" class="hidden shrink-0 items-center gap-2 bg-emerald-950/80 border border-emerald-400/50 px-3.5 py-2 rounded-xl text-emerald-300 text-xs font-bold">
+                            <span class="animate-spin">🎵</span> Muzik Ceria (5s)...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Butang Seterusnya -->
+                <div class="flex justify-end">
+                    <button id="btn-next-round" onclick="proceedAfterQuiz()" class="hidden btn-game bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white font-game font-bold py-3 px-6 rounded-2xl text-sm sm:text-base">
+                        Pusingan Seterusnya ➡️
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. SKRIN KEPUTUSAN AKHIR (TAMAT 20 SOALAN) -->
+        <section id="screen-gameover" class="hidden max-w-2xl mx-auto w-full bg-slate-900/95 border border-slate-700 rounded-3xl p-6 sm:p-8 text-center shadow-2xl animate-pop">
+            <div class="text-5xl mb-3">👑</div>
+            <h2 class="font-game text-3xl sm:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-emerald-300 mb-2">
+                Permainan Tamat!
+            </h2>
+            <p id="final-winner-announcement" class="text-base sm:text-lg font-semibold text-slate-200 mb-6">
+                Tahniah kepada pemenang keseluruhan!
+            </p>
+
+            <div class="grid grid-cols-2 gap-4 mb-8">
+                <div id="final-p1-card" class="bg-blue-950/50 border border-blue-700/60 rounded-2xl p-4">
+                    <div class="text-xs font-bold text-blue-300 uppercase">Pemain 1</div>
+                    <div id="final-p1-name" class="font-game text-lg font-bold text-white mt-1">Aiman</div>
+                    <div id="final-p1-score" class="font-game text-4xl font-extrabold text-blue-400 mt-2">0</div>
+                    <div class="text-xs text-slate-400 mt-1">Markah</div>
+                </div>
+
+                <div id="final-p2-card" class="bg-rose-950/50 border border-rose-700/60 rounded-2xl p-4">
+                    <div class="text-xs font-bold text-rose-300 uppercase">Pemain 2</div>
+                    <div id="final-p2-name" class="font-game text-lg font-bold text-white mt-1">Siti</div>
+                    <div id="final-p2-score" class="font-game text-4xl font-extrabold text-rose-400 mt-2">0</div>
+                    <div class="text-xs text-slate-400 mt-1">Markah</div>
+                </div>
+            </div>
+
+            <button onclick="resetFullGame()" class="btn-game w-full sm:w-auto bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-game font-bold text-lg py-3.5 px-8 rounded-2xl">
+                🔄 Main Semula (20 Soalan Baharu)
+            </button>
+        </section>
+
+    </main>
+
+    <!-- NOTIFIKASI TOAST RINGKAS (PENGGANTI ALERT) -->
+    <div id="toast-box" class="fixed bottom-4 right-4 z-50 hidden bg-slate-800 border border-slate-600 text-white px-4 py-3 rounded-2xl shadow-2xl text-xs sm:text-sm font-medium max-w-xs">
+    </div>
+
+    <script>
+        /**
+         * ============================================================================
+         * 1. BANK SOALAN MCQ BIOLOGI KSSM TINGKATAN 4 (BAB 7 – BAB 15) - 20 SOALAN
+         * ============================================================================
+         */
+        const biologyQuestions = [
+            {
+                bab: "Bab 7: Respirasi Sel",
+                question: "Apakah hasil akhir utama bagi proses fermentasi asid laktik yang berlaku dalam sel otot manusia semasa aktiviti cergas?",
+                options: ["Etanol dan karbon dioksida", "Asid laktik dan ATP", "Asid piruvik dan air", "Glukosa dan oksigen"],
+                answer: 1,
+                explanation: "Dalam keadaan kekurangan oksigen, sel otot menjalankan fermentasi asid laktik yang menghasilkan asid laktik dan 2 molekul ATP."
+            },
+            {
+                bab: "Bab 7: Respirasi Sel",
+                question: "Di manakah berlakunya proses glikolisis dalam sel eukariot?",
+                options: ["Matriks mitokondrion", "Krista mitokondrion", "Sitoplasma", "Jalinan endoplasma"],
+                answer: 2,
+                explanation: "Glikolisis berlaku di dalam sitoplasma dan tidak memerlukan kehadiran oksigen untuk memecahkan glukosa kepada piruvat."
+            },
+            {
+                bab: "Bab 8: Sistem Respirasi dalam Manusia dan Haiwan",
+                question: "Apakah struktur respirasi khas bagi serangga seperti belalang untuk pertukaran gas secara langsung dengan sel badan?",
+                options: ["Insang", "Trakeol", "Alveolus", "Peparu buku"],
+                answer: 1,
+                explanation: "Trakeol mempunyai dinding nipis dan lembap yang membolehkan gas meresap secara terus antara udara dan sel badan serangga."
+            },
+            {
+                bab: "Bab 8: Sistem Respirasi dalam Manusia dan Haiwan",
+                question: "Bagaimanakah mekanisme menarik nafas berlaku pada manusia?",
+                options: [
+                    "Otot interkosta luar mengecut, diafragma mendatar, isi padu rongga toraks bertambah",
+                    "Otot interkosta dalam mengecut, diafragma melengkung, isi padu rongga toraks berkurang",
+                    "Otot interkosta luar mengendur, sangkar rusuk bergerak ke bawah dan ke dalam",
+                    "Tekanan udara dalam peparu lebih tinggi daripada tekanan atmosfera"
+                ],
+                answer: 0,
+                explanation: "Pengecutan otot interkosta luar dan diafragma meningkatkan isi padu rongga toraks lalu menurunkan tekanan udara di dalam peparu."
+            },
+            {
+                bab: "Bab 9: Nutrisi dan Sistem Pencernaan Manusia",
+                question: "Enzim manakah yang dirembeskan oleh kelenjar gastrik di dalam perut untuk menghidrolisis protein kepada polipeptida?",
+                options: ["Amilase", "Lipase", "Pepsin", "Tripsin"],
+                answer: 2,
+                explanation: "Pepsin diaktifkan daripada pepsinogen oleh asid hidroklorik di dalam perut untuk mencernakan protein kepada polipeptida."
+            },
+            {
+                bab: "Bab 9: Nutrisi dan Sistem Pencernaan Manusia",
+                question: "Apakah fungsi utama jus hempedu yang dihasilkan oleh hati dalam proses pencernaan lipid?",
+                options: [
+                    "Menghidrolisis lipid kepada asid lemak dan gliserol",
+                    "Mengemulsikan lipid kepada titisan kecil dan meneutralkan asid kim",
+                    "Menyerap vitamin larut lemak ke dalam lakteal",
+                    "Mengaktifkan enzim pepsin di duodenum"
+                ],
+                answer: 1,
+                explanation: "Hempedu tidak mengandungi enzim, sebaliknya garam hempedu mengemulsikan lemak bagi menambah luas permukaan tindakan lipase."
+            },
+            {
+                bab: "Bab 10: Pengangkutan dalam Manusia dan Haiwan",
+                question: "Bahagian jantung manakah yang mengepam darah beroksigen keluar melalui aorta ke seluruh bahagian badan kecuali peparu?",
+                options: ["Atrium kanan", "Ventrikel kanan", "Atrium kiri", "Ventrikel kiri"],
+                answer: 3,
+                explanation: "Ventrikel kiri mempunyai dinding berotot paling tebal untuk menjana tekanan tinggi bagi mengepam darah ke seluruh badan."
+            },
+            {
+                bab: "Bab 10: Pengangkutan dalam Manusia dan Haiwan",
+                question: "Apakah peranan ion kalsium (Ca²⁺) dan vitamin K dalam mekanisme pembekuan darah?",
+                options: [
+                    "Menukarkan fibrinogen kepada fibrin secara langsung",
+                    "Menukarkan protrombin tidak aktif kepada trombin aktif",
+                    "Merangsang penghasilan antibodi oleh limfosit",
+                    "Mengangkut oksigen dalam bentuk oksihemoglobin"
+                ],
+                answer: 1,
+                explanation: "Trombokinase bersama ion kalsium dan vitamin K memangkinkan penukaran protrombin kepada trombin."
+            },
+            {
+                bab: "Bab 11: Keimunan Manusia",
+                question: "Suntikan vaksin hepatitis B memberikan jenis keimunan yang manakah kepada seseorang individu?",
+                options: [
+                    "Keimunan aktif semula jadi",
+                    "Keimunan aktif buatan",
+                    "Keimunan pasif semula jadi",
+                    "Keimunan pasif buatan"
+                ],
+                answer: 1,
+                explanation: "Vaksin mengandungi patogen yang dilemahkan atau dimatikan yang merangsang limfosit menghasilkan antibodi sendiri (aktif buatan)."
+            },
+            {
+                bab: "Bab 11: Keimunan Manusia",
+                question: "Bagaimanakah virus HIV melemahkan sistem keimunan manusia?",
+                options: [
+                    "Memusnahkan sel darah merah dan menyebabkan anemia teruk",
+                    "Menyerang dan memusnahkan sel limfosit T pembantu",
+                    "Menghalang pembekuan darah pada luka terbuka",
+                    "Merangsang penghasilan histamin secara berlebihan"
+                ],
+                answer: 1,
+                explanation: "HIV membiak di dalam sel limfosit T dan memusnahkannya, menyebabkan badan gagal melawan jangkitan patogen lain."
+            },
+            {
+                bab: "Bab 12: Koordinasi dan Gerak Balas dalam Manusia",
+                question: "Bahagian otak manusia yang manakah mengawal keseimbangan badan dan koordinasi pengecutan otot rangka?",
+                options: ["Serebrum", "Serebelum", "Medula oblongata", "Hipotalamus"],
+                answer: 1,
+                explanation: "Serebelum menerima maklumat daripada reseptor regangan otot dan telinga dalam untuk mengekalkan keseimbangan badan."
+            },
+            {
+                bab: "Bab 12: Koordinasi dan Gerak Balas dalam Manusia",
+                question: "Apakah urutan laluan impuls saraf yang betul dalam arka refleks sentakan lutut?",
+                options: [
+                    "Reseptor → Neuron deria → Neuron motor → Efektor",
+                    "Reseptor → Neuron motor → Neuron geganti → Efektor",
+                    "Efektor → Neuron deria → Neuron geganti → Reseptor",
+                    "Reseptor → Neuron geganti → Neuron deria → Efektor"
+                ],
+                answer: 0,
+                explanation: "Refleks sentakan lutut melibatkan arka refleks dua neuron (tanpa neuron geganti): reseptor → neuron deria → neuron motor → efektor."
+            },
+            {
+                bab: "Bab 13: Homeostasis dan Sistem Urinari Manusia",
+                question: "Apakah yang berlaku apabila tekanan osmosis darah meningkat melebihi julat normal selepas makan makanan masin?",
+                options: [
+                    "Kelenjar pituitari merembeskan lebih banyak hormon antidiuresis (ADH)",
+                    "Dinding tubul berlingkar distal menjadi kurang telap terhadap air",
+                    "Lebih banyak air kencing yang cair dihasilkan",
+                    "Kelenjar adrenal merembeskan lebih banyak aldosteron"
+                ],
+                answer: 0,
+                explanation: "ADH meningkatkan ketelapan tubul pengumpul terhadap air supaya lebih banyak air diserap semula ke dalam kapilari darah."
+            },
+            {
+                bab: "Bab 13: Homeostasis dan Sistem Urinari Manusia",
+                question: "Proses pembentukan air kencing di dalam nefron melibatkan tiga peringkat utama mengikut urutan:",
+                options: [
+                    "Penyerapan semula → Ultraturasan → Rembesan",
+                    "Ultraturasan → Penyerapan semula → Rembesan",
+                    "Rembesan → Ultraturasan → Penyerapan semula",
+                    "Ultraturasan → Rembesan → Penyerapan semula"
+                ],
+                answer: 1,
+                explanation: "Tiga proses utama di nefron ialah ultraturasan di kapsul Bowman, diikuti penyerapan semula dan rembesan di tubul renal."
+            },
+            {
+                bab: "Bab 14: Sokongan dan Pergerakan dalam Manusia dan Haiwan",
+                question: "Tulang vertebra yang manakah mempunyai cuaran spina yang panjang dan menghala ke bawah untuk perlekatan otot belakang?",
+                options: ["Vertebra serviks", "Vertebra toraks", "Vertebra lumbar", "Vertebra sakrum"],
+                answer: 1,
+                explanation: "Vertebra toraks mempunyai cuaran spina yang panjang dan condong ke bawah serta muka sendi untuk artikulasi dengan tulang rusuk."
+            },
+            {
+                bab: "Bab 14: Sokongan dan Pergerakan dalam Manusia dan Haiwan",
+                question: "Apakah tindakan otot antagonis semasa meluruskan lengan pada sendi engsel siku?",
+                options: [
+                    "Otot biseps mengecut dan otot triseps mengendur",
+                    "Otot biseps mengendur dan otot triseps mengecut",
+                    "Kedua-dua otot biseps dan triseps mengecut serentak",
+                    "Tendon memendek manakala ligamen memanjang"
+                ],
+                answer: 1,
+                explanation: "Untuk meluruskan lengan, otot triseps mengecut menarik ulna ke bawah manakala otot biseps mengendur."
+            },
+            {
+                bab: "Bab 15: Pembiakan Seks, Perkembangan dan Pertumbuhan",
+                question: "Hormon manakah yang mengalami lonjakan mendadak pada hari ke-14 kitar haid untuk mencetuskan proses pengovulan?",
+                options: ["Estrogen", "Progesteron", "Hormon peluteinan (LH)", "Hormon perangsang folikel (FSH)"],
+                answer: 2,
+                explanation: "Aras estrogen yang tinggi merangsang rembesan hormon peluteinan (LH) secara mendadak bagi membebaskan oosit sekunder daripada folikel Graaf."
+            },
+            {
+                bab: "Bab 15: Pembiakan Seks, Perkembangan dan Pertumbuhan",
+                question: "Di manakah berlakunya proses persenyawaan antara sperma dan oosit sekunder dalam sistem pembiakan wanita?",
+                options: ["Uterus", "Serviks", "Tiub Falopio", "Ovari"],
+                answer: 2,
+                explanation: "Persenyawaan berlaku di dalam tiub Falopio membentuk zigot diploid sebelum bergerak menuju ke uterus untuk penempelan."
+            },
+            {
+                bab: "Bab 15: Pembiakan Seks, Perkembangan dan Pertumbuhan",
+                question: "Apakah fungsi utama plasenta semasa perkembangan fetus di dalam uterus ibu?",
+                options: [
+                    "Menghasilkan cecair amnion untuk menyerap hentakan",
+                    "Tapak pertukaran nutrien, oksigen dan bahan kumuh antara darah ibu dan fetus",
+                    "Menghubungkan fetus secara terus dengan sistem saraf pusat ibu",
+                    "Menyimpan sel telur yang belum disenyawakan"
+                ],
+                answer: 1,
+                explanation: "Plasenta membolehkan resapan nutrien dan oksigen daripada darah ibu ke fetus serta bahan kumuh daripada fetus ke darah ibu tanpa percampuran darah."
+            },
+            {
+                bab: "Bab 14: Sokongan dan Pergerakan dalam Manusia dan Haiwan",
+                question: "Apakah fungsi bendalir sinovia di dalam sendi bergerak seperti sendi lutut?",
+                options: [
+                    "Menyambungkan tulang kepada otot rangka",
+                    "Bertindak sebagai pelincir yang mengurangkan geseran antara hujung tulang",
+                    "Menghasilkan sel darah merah baharu",
+                    "Mengikat dua tulang supaya tidak terkehel"
+                ],
+                answer: 1,
+                explanation: "Bendalir sinovia yang dirembeskan oleh membran sinovia melicinkan pergerakan sendi dan membekalkan nutrien kepada rawan."
+            }
+        ];
+
+        /**
+         * ============================================================================
+         * 2. KEADAAN APLIKASI (STATE MANAGEMENT)
+         * ============================================================================
+         */
+        let gameState = {
+            p1Name: "Aiman",
+            p2Name: "Siti",
+            p1Score: 0,
+            p2Score: 0,
+            currentQuestionIndex: 0,
+            cameraEnabled: false,
+            soundEnabled: true,
+            // Isyarat langsung daripada kamera (dikesan secara berterusan)
+            liveGestureP1: null,
+            liveGestureP2: null,
+            // Pilihan manual jika pengguna klik butang manual
+            manualMoveP1: null,
+            manualMoveP2: null,
+            // Pemenang pusingan semasa (1 atau 2)
+            roundWinner: null,
+            isCountingDown: false,
+            quizTimerInterval: null,
+            timeLeft: 120,
+            questionAnswered: false,
+            musicLoop: null
+        };
+
+        // Pemetaan emoji & label isyarat
+        const GESTURE_INFO = {
+            BATU: { emoji: "✊", label: "BATU" },
+            AIR: { emoji: "✋", label: "AIR" },
+            GUNTING: { emoji: "✌️", label: "GUNTING" }
+        };
+
+        /**
+         * ============================================================================
+         * 3. SISTEM AUDIO (TONE.JS MUZIK CERIA 5 SAAT & WEB SPEECH API SUARA PEMENANG)
+         * ============================================================================
+         */
+        function toggleAudio() {
+            gameState.soundEnabled = !gameState.soundEnabled;
+            const btn = document.getElementById("btn-toggle-sound");
+            btn.textContent = gameState.soundEnabled ? "🔊" : "🔇";
+            if (!gameState.soundEnabled) {
+                stopCheerfulMusic();
+                window.speechSynthesis.cancel();
+            }
+            showToast(gameState.soundEnabled ? "Audio & Muzik Diaktifkan" : "Audio & Muzik Disenyapkan");
+        }
+
+        // Bunyi bip kiraan detik 3, 2, 1
+        async function playBeep(freq = 520, duration = "16n") {
+            if (!gameState.soundEnabled) return;
+            try {
+                await Tone.start();
+                const synth = new Tone.Synth({
+                    oscillator: { type: "triangle" },
+                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.1, release: 0.1 }
+                }).toDestination();
+                synth.triggerAttackRelease(freq, duration);
+            } catch (e) {
+                console.warn("Ralat audio Tone.js:", e);
+            }
+        }
+
+        // Bunyi jawapan salah
+        async function playWrongSound() {
+            if (!gameState.soundEnabled) return;
+            try {
+                await Tone.start();
+                const synth = new Tone.SawtoothSynth().toDestination();
+                synth.volume.value = -8;
+                const now = Tone.now();
+                synth.triggerAttackRelease("F3", "8n", now);
+                synth.triggerAttackRelease("D3", "4n", now + 0.18);
+            } catch (e) {
+                console.warn("Ralat bunyi salah:", e);
+            }
+        }
+
+        // Muzik latar belakang ceria selama tepat 5 saat bagi setiap jawapan betul
+        async function playCheerfulMusic5Seconds() {
+            if (!gameState.soundEnabled) return;
+            stopCheerfulMusic();
+
+            try {
+                await Tone.start();
+                const indicator = document.getElementById("music-playing-indicator");
+                if (indicator) {
+                    indicator.classList.remove("hidden");
+                    indicator.classList.add("flex");
+                }
+
+                // Sintesis polifonik ceria (gaya marimba / melodi kemenangan)
+                const synth = new Tone.PolySynth(Tone.Synth, {
+                    oscillator: { type: "sine" },
+                    envelope: { attack: 0.02, decay: 0.2, sustain: 0.3, release: 0.4 }
+                }).toDestination();
+                synth.volume.value = -6;
+
+                // Melodi ceria berulang selama 5 saat
+                const notes = [
+                    { time: "0:0:0", note: ["C5", "E5", "G5"], dur: "8n" },
+                    { time: "0:0:2", note: ["E5", "G5"], dur: "8n" },
+                    { time: "0:1:0", note: ["G5", "B5"], dur: "8n" },
+                    { time: "0:1:2", note: ["C6", "E6"], dur: "4n" },
+                    { time: "0:2:2", note: ["A5", "C6"], dur: "8n" },
+                    { time: "0:3:0", note: ["G5", "B5"], dur: "8n" },
+                    { time: "0:3:2", note: ["E5", "G5"], dur: "8n" },
+                    { time: "1:0:0", note: ["F5", "A5", "C6"], dur: "8n" },
+                    { time: "1:0:2", note: ["G5", "B5", "D6"], dur: "8n" },
+                    { time: "1:1:0", note: ["C6", "E6", "G6"], dur: "2n" }
+                ];
+
+                Tone.Transport.bpm.value = 135;
+                const part = new Tone.Part((time, value) => {
+                    synth.triggerAttackRelease(value.note, value.dur, time);
+                }, notes);
+
+                part.loop = true;
+                part.loopEnd = "1:3:0";
+                part.start(0);
+                Tone.Transport.start();
+
+                gameState.musicLoop = { part, synth };
+
+                // Hentikan muzik secara automatik selepas 5 saat (5000ms)
+                setTimeout(() => {
+                    stopCheerfulMusic();
+                }, 5000);
+
+            } catch (e) {
+                console.warn("Ralat muzik ceria:", e);
+            }
+        }
+
+        function stopCheerfulMusic() {
+            const indicator = document.getElementById("music-playing-indicator");
+            if (indicator) {
+                indicator.classList.add("hidden");
+                indicator.classList.remove("flex");
+            }
+            if (gameState.musicLoop) {
+                try {
+                    Tone.Transport.stop();
+                    gameState.musicLoop.part.dispose();
+                    gameState.musicLoop.synth.dispose();
+                } catch (e) {}
+                gameState.musicLoop = null;
+            }
+        }
+
+        // Sintesis Suara (Text-to-Speech) untuk menyebut nama pemenang Batu Air Gunting
+        function announceWinnerVoice(winnerName) {
+            if (!gameState.soundEnabled || !("speechSynthesis" in window)) return;
+            try {
+                window.speechSynthesis.cancel();
+                const text = `Tahniah ${winnerName}! Anda memenangi pusingan ini. Sila jawab soalan Biologi.`;
+                const utterance = new SpeechSynthesisUtterance(text);
+                // Cuba pilih suara Bahasa Melayu atau Indonesia jika tersedia, jika tidak guna lalai
+                const voices = window.speechSynthesis.getVoices();
+                const msVoice = voices.find(v => v.lang.includes("ms") || v.lang.includes("id"));
+                if (msVoice) utterance.voice = msVoice;
+                utterance.lang = "ms-MY";
+                utterance.rate = 1.02;
+                utterance.pitch = 1.1;
+                window.speechSynthesis.speak(utterance);
+            } catch (e) {
+                console.warn("Ralat sintesis suara:", e);
+            }
+        }
+
+        /**
+         * ============================================================================
+         * 4. PENGECAMAN ISYARAT TANGAN MEDIAPIPE HANDS (KAMERA BELAH DUA)
+         * ============================================================================
+         */
+        let handsDetector = null;
+        let webcamStream = null;
+        let animationFrameId = null;
+
+        // Klasifikasi titik mercu (landmarks) jari untuk menentukan BATU, AIR, atau GUNTING
+        function classifyHandGesture(landmarks) {
+            // Indeks hujung jari (tip) dan sendi tengah (PIP):
+            // Telunjuk: 8 vs 6 | Tengah: 12 vs 10 | Manis: 16 vs 14 | Kelingking: 20 vs 18
+            const indexOpen = landmarks[8].y < landmarks[6].y;
+            const middleOpen = landmarks[12].y < landmarks[10].y;
+            const ringOpen = landmarks[16].y < landmarks[14].y;
+            const pinkyOpen = landmarks[20].y < landmarks[18].y;
+
+            const openCount = [indexOpen, middleOpen, ringOpen, pinkyOpen].filter(Boolean).length;
+
+            if (openCount === 0) {
+                return "BATU"; // Semua jari digenggam
+            } else if (openCount >= 4) {
+                return "AIR"; // Tapak tangan terbuka luas
+            } else if (indexOpen && middleOpen && !ringOpen && !pinkyOpen) {
+                return "GUNTING"; // Jari telunjuk dan tengah terbuka (V)
+            }
+            return null;
+        }
+
+        async function initMediaPipeAndCamera() {
+            const videoElement = document.getElementById("webcam-video");
+            const canvasElement = document.getElementById("split-canvas");
+            const canvasCtx = canvasElement.getContext("2d");
+            const mpBadge = document.getElementById("mediapipe-badge");
+
+            try {
+                // Minta akses kamera web pengguna
+                webcamStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
+                    audio: false
+                });
+                videoElement.srcObject = webcamStream;
+                await videoElement.play();
+
+                gameState.cameraEnabled = true;
+                mpBadge.textContent = "📷 Kamera Aktif • Mengesan 2 Tangan";
+                mpBadge.className = "px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-semibold";
+
+                // Konfigurasi MediaPipe Hands untuk mengesan sehingga 2 tangan serentak
+                handsDetector = new Hands({
+                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+                });
+
+                handsDetector.setOptions({
+                    maxNumHands: 2,
+                    modelComplexity: 1,
+                    minDetectionConfidence: 0.65,
+                    minTrackingConfidence: 0.6
+                });
+
+                handsDetector.onResults((results) => {
+                    drawSplitCanvas(results, videoElement, canvasElement, canvasCtx);
+                });
+
+                // Gelung pemprosesan bingkai video
+                async function processVideoFrame() {
+                    if (!gameState.cameraEnabled) return;
+                    if (videoElement.readyState >= 2) {
+                        await handsDetector.send({ image: videoElement });
+                    }
+                    animationFrameId = requestAnimationFrame(processVideoFrame);
+                }
+                processVideoFrame();
+
+            } catch (err) {
+                console.warn("Kamera tidak dapat diakses, beralih ke mod manual:", err);
+                gameState.cameraEnabled = false;
+                mpBadge.textContent = "🎮 Mod Manual Aktif (Tiada Kamera)";
+                mpBadge.className = "px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-semibold";
+                showToast("Kamera tidak ditemui. Sila gunakan butang sokongan manual di bawah.");
+                startFallbackCanvasLoop();
+            }
+        }
+
+        // Lukis suapan kamera belah dua berserta rangka tangan MediaPipe
+        function drawSplitCanvas(results, video, canvas, ctx) {
+            const container = document.getElementById("canvas-wrapper");
+            if (canvas.width !== container.clientWidth || canvas.height !== container.clientHeight) {
+                canvas.width = container.clientWidth;
+                canvas.height = container.clientHeight;
+            }
+
+            ctx.save();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Lukis imej kamera penuh (diterbalikkan secara mendatar oleh CSS mirror-canvas)
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Warna tindanan lembut untuk zon Pemain 1 (Kiri di skrin = x > 0.5 dalam koordinat video asal)
+            // dan Pemain 2 (Kanan di skrin = x <= 0.5 dalam koordinat video asal)
+            ctx.fillStyle = "rgba(59, 130, 246, 0.12)"; // Zon Pemain 1
+            ctx.fillRect(canvas.width / 2, 0, canvas.width / 2, canvas.height);
+
+            ctx.fillStyle = "rgba(244, 63, 94, 0.12)"; // Zon Pemain 2
+            ctx.fillRect(0, 0, canvas.width / 2, canvas.height);
+
+            let detectedP1 = null;
+            let detectedP2 = null;
+
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                for (const landmarks of results.multiHandLandmarks) {
+                    // Koordinat x pergelangan tangan (landmark 0)
+                    // Kerana canvas dicerminkan (scaleX(-1)), x > 0.5 berada di sebelah KIRI skrin (Pemain 1)
+                    // dan x <= 0.5 berada di sebelah KANAN skrin (Pemain 2)
+                    const wristX = landmarks[0].x;
+                    const isPlayer1Side = wristX > 0.5;
+                    const gesture = classifyHandGesture(landmarks);
+
+                    // Lukis sambungan tulang jari dengan warna mengikut pemain
+                    const lineColor = isPlayer1Side ? "#60a5fa" : "#fb7185";
+                    const dotColor = isPlayer1Side ? "#2563eb" : "#e11d48";
+
+                    drawConnectors(ctx, landmarks, HAND_CONNECTIONS, { color: lineColor, lineWidth: 3 });
+                    drawLandmarks(ctx, landmarks, { color: dotColor, lineWidth: 1, radius: 4 });
+
+                    if (isPlayer1Side && gesture) {
+                        detectedP1 = gesture;
+                    } else if (!isPlayer1Side && gesture) {
+                        detectedP2 = gesture;
+                    }
+                }
+            }
+
+            gameState.liveGestureP1 = detectedP1;
+            gameState.liveGestureP2 = detectedP2;
+            updateRPSHudLabels();
+            ctx.restore();
+        }
+
+        // Kanvas visual menarik sekiranya pengguna bermain tanpa kamera (Mod Manual)
+        function startFallbackCanvasLoop() {
+            const canvas = document.getElementById("split-canvas");
+            const ctx = canvas.getContext("2d");
+
+            function renderManualBackground() {
+                if (gameState.cameraEnabled) return;
+                const container = document.getElementById("canvas-wrapper");
+                if (canvas.width !== container.clientWidth || canvas.height !== container.clientHeight) {
+                    canvas.width = container.clientWidth;
+                    canvas.height = container.clientHeight;
+                }
+
+                // Latar belakang belah dua biru & merah jambu
+                // Nota: mirror-canvas membalikkan kiri dan kanan secara visual
+                ctx.fillStyle = "#172554"; // Biru gelap (Kiri visual)
+                ctx.fillRect(canvas.width / 2, 0, canvas.width / 2, canvas.height);
+
+                ctx.fillStyle = "#4c0519"; // Merah gelap (Kanan visual)
+                ctx.fillRect(0, 0, canvas.width / 2, canvas.height);
+
+                // Paparkan emoji pilihan manual besar di tengah zon masing-masing
+                ctx.save();
+                ctx.scale(-1, 1); // Nyah-cermin untuk lukisan teks/emoji supaya tidak terbalik
+                ctx.font = "bold 72px Fredoka, sans-serif";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+
+                const p1Emoji = gameState.manualMoveP1 ? GESTURE_INFO[gameState.manualMoveP1].emoji : "❔";
+                const p2Emoji = gameState.manualMoveP2 ? GESTURE_INFO[gameState.manualMoveP2].emoji : "❔";
+
+                ctx.fillStyle = "#ffffff";
+                ctx.fillText(p1Emoji, -canvas.width * 0.25, canvas.height * 0.55);
+                ctx.fillText(p2Emoji, -canvas.width * 0.75, canvas.height * 0.55);
+                ctx.restore();
+
+                updateRPSHudLabels();
+                requestAnimationFrame(renderManualBackground);
+            }
+            renderManualBackground();
+        }
+
+        function updateRPSHudLabels() {
+            const p1Label = document.getElementById("p1-detected-label");
+            const p2Label = document.getElementById("p2-detected-label");
+
+            const activeP1 = gameState.manualMoveP1 || gameState.liveGestureP1;
+            const activeP2 = gameState.manualMoveP2 || gameState.liveGestureP2;
+
+            if (activeP1) {
+                const info = GESTURE_INFO[activeP1];
+                p1Label.innerHTML = `<span>${info.emoji}</span> Dikesan: <strong>${info.label}</strong>`;
+                p1Label.className = "mt-1 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-emerald-600/60 text-white text-xs font-semibold";
+            } else {
+                p1Label.innerHTML = `<span>⏳</span> Tunjuk tangan / pilih...`;
+                p1Label.className = "mt-1 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-blue-600/40 text-blue-100 text-xs font-semibold";
+            }
+
+            if (activeP2) {
+                const info = GESTURE_INFO[activeP2];
+                p2Label.innerHTML = `<span>${info.emoji}</span> Dikesan: <strong>${info.label}</strong>`;
+                p2Label.className = "mt-1 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-emerald-600/60 text-white text-xs font-semibold";
+            } else {
+                p2Label.innerHTML = `<span>⏳</span> Tunjuk tangan / pilih...`;
+                p2Label.className = "mt-1 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-rose-600/40 text-rose-100 text-xs font-semibold";
+            }
+        }
+
+        /**
+         * ============================================================================
+         * 5. LOGIK PERMAINAN BATU, AIR, GUNTING
+         * ============================================================================
+         */
+        function startGame(useCamera) {
+            const p1Input = document.getElementById("input-p1-name").value.trim();
+            const p2Input = document.getElementById("input-p2-name").value.trim();
+
+            gameState.p1Name = p1Input || "Pemain 1";
+            gameState.p2Name = p2Input || "Pemain 2";
+            gameState.p1Score = 0;
+            gameState.p2Score = 0;
+            gameState.currentQuestionIndex = 0;
+
+            // Kemas kini semua paparan nama pemain
+            document.getElementById("header-p1-name").textContent = gameState.p1Name;
+            document.getElementById("header-p2-name").textContent = gameState.p2Name;
+            document.getElementById("p1-hud-name").textContent = gameState.p1Name;
+            document.getElementById("p2-hud-name").textContent = gameState.p2Name;
+            document.querySelectorAll(".p1-name-span").forEach(el => el.textContent = gameState.p1Name);
+            document.querySelectorAll(".p2-name-span").forEach(el => el.textContent = gameState.p2Name);
+            updateScoreUI();
+
+            // Pindah ke skrin Arena Batu Air Gunting
+            switchScreen("screen-rps");
+            prepareRPSRound();
+
+            if (useCamera) {
+                initMediaPipeAndCamera();
+            } else {
+                gameState.cameraEnabled = false;
+                document.getElementById("mediapipe-badge").textContent = "🎮 Mod Butang Manual Aktif";
+                startFallbackCanvasLoop();
+            }
+        }
+
+        function prepareRPSRound() {
+            gameState.manualMoveP1 = null;
+            gameState.manualMoveP2 = null;
+            gameState.isCountingDown = false;
+
+            const qNum = gameState.currentQuestionIndex + 1;
+            document.getElementById("question-counter-badge").textContent = `Soalan ${qNum} / ${biologyQuestions.length}`;
+            document.getElementById("rps-announcement").textContent = "Sedia untuk Batu, Air, Gunting!";
+            document.getElementById("rps-subtext").textContent = "Tunjukkan isyarat tangan pada kamera atau pilih butang manual, kemudian tekan MULA KIRAAN.";
+            document.getElementById("btn-trigger-round").disabled = false;
+            document.getElementById("btn-trigger-round").classList.remove("opacity-50", "cursor-not-allowed");
+        }
+
+        function setManualMove(playerNum, move) {
+            if (gameState.isCountingDown) return;
+            if (playerNum === 1) {
+                gameState.manualMoveP1 = move;
+                showToast(`${gameState.p1Name} memilih ${move}`);
+            } else {
+                gameState.manualMoveP2 = move;
+                showToast(`${gameState.p2Name} memilih ${move}`);
+            }
+            playBeep(660, "32n");
+            updateRPSHudLabels();
+        }
+
+        // Kiraan detik 3, 2, 1 sebelum menilai pemenang Batu Air Gunting
+        function triggerRPSRound() {
+            if (gameState.isCountingDown) return;
+            gameState.isCountingDown = true;
+
+            const btn = document.getElementById("btn-trigger-round");
+            btn.disabled = true;
+            btn.classList.add("opacity-50", "cursor-not-allowed");
+
+            const overlay = document.getElementById("countdown-overlay");
+            const numEl = document.getElementById("countdown-number");
+            overlay.classList.remove("hidden");
+
+            let count = 3;
+            numEl.textContent = count;
+            playBeep(440, "16n");
+
+            const timer = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    numEl.textContent = count;
+                    playBeep(440, "16n");
+                } else {
+                    clearInterval(timer);
+                    overlay.classList.add("hidden");
+                    playBeep(880, "8n");
+                    evaluateRPSWinner();
+                }
+            }, 850);
+        }
+
+        function evaluateRPSWinner() {
+            // Utamakan pilihan manual jika diklik, jika tiada ambil daripada pengesanan langsung MediaPipe
+            const move1 = gameState.manualMoveP1 || gameState.liveGestureP1;
+            const move2 = gameState.manualMoveP2 || gameState.liveGestureP2;
+
+            const announceEl = document.getElementById("rps-announcement");
+            const subtextEl = document.getElementById("rps-subtext");
+
+            // Semak jika salah seorang pemain tidak menunjukkan isyarat yang sah
+            if (!move1 || !move2) {
+                announceEl.textContent = "⚠️ Isyarat Tidak Lengkap!";
+                subtextEl.textContent = `${!move1 ? gameState.p1Name : ""} ${!move1 && !move2 ? "dan" : ""} ${!move2 ? gameState.p2Name : ""} belum menunjukkan isyarat sah. Cuba lagi!`;
+                gameState.isCountingDown = false;
+                const btn = document.getElementById("btn-trigger-round");
+                btn.disabled = false;
+                btn.classList.remove("opacity-50", "cursor-not-allowed");
+                return;
+            }
+
+            const m1Info = GESTURE_INFO[move1];
+            const m2Info = GESTURE_INFO[move2];
+
+            // Semak Seri
+            if (move1 === move2) {
+                announceEl.textContent = `🤝 SERI! (${m1Info.emoji} vs ${m2Info.emoji})`;
+                subtextEl.textContent = `Kedua-dua pemain memilih ${m1Info.label}. Sila main semula pusingan ini!`;
+                gameState.manualMoveP1 = null;
+                gameState.manualMoveP2 = null;
+                gameState.isCountingDown = false;
+                const btn = document.getElementById("btn-trigger-round");
+                btn.disabled = false;
+                btn.classList.remove("opacity-50", "cursor-not-allowed");
+                return;
+            }
+
+            // Peraturan Batu, Air, Gunting:
+            // BATU kalahkan GUNTING | AIR kalahkan BATU | GUNTING kalahkan AIR
+            const p1Wins =
+                (move1 === "BATU" && move2 === "GUNTING") ||
+                (move1 === "AIR" && move2 === "BATU") ||
+                (move1 === "GUNTING" && move2 === "AIR");
+
+            gameState.roundWinner = p1Wins ? 1 : 2;
+            const winnerName = p1Wins ? gameState.p1Name : gameState.p2Name;
+
+            announceEl.textContent = `🏆 ${winnerName.toUpperCase()} MENANG! (${m1Info.emoji} vs ${m2Info.emoji})`;
+            subtextEl.textContent = `${winnerName} mendapat masa 120 saat untuk menjawab soalan Biologi!`;
+
+            // Sebut nama pemenang menggunakan Web Speech API
+            announceWinnerVoice(winnerName);
+
+            // Tunggu 2.4 saat supaya pemain sempat melihat keputusan & mendengar suara pemenang sebelum masuk ke soalan
+            setTimeout(() => {
+                gameState.isCountingDown = false;
+                launchBiologyQuiz();
+            }, 2400);
+        }
+
+        /**
+         * ============================================================================
+         * 6. SISTEM KUIZ MCQ BIOLOGI (120 SAAT & MUZIK CERIA 5 SAAT)
+         * ============================================================================
+         */
+        function launchBiologyQuiz() {
+            stopCheerfulMusic();
+            gameState.questionAnswered = false;
+            gameState.timeLeft = 120; // 2 minit (120 saat)
+
+            const qData = biologyQuestions[gameState.currentQuestionIndex];
+            const winnerName = gameState.roundWinner === 1 ? gameState.p1Name : gameState.p2Name;
+
+            // Kemas kini tema kad kuiz mengikut warna pemenang
+            const quizCard = document.getElementById("quiz-card");
+            const winnerAvatar = document.getElementById("winner-avatar");
+            if (gameState.roundWinner === 1) {
+                quizCard.className = "bg-slate-900/95 border-2 rounded-3xl p-5 sm:p-8 shadow-2xl glow-p1";
+                winnerAvatar.className = "w-12 h-12 rounded-2xl bg-blue-500/20 border border-blue-400 flex items-center justify-center text-2xl";
+            } else {
+                quizCard.className = "bg-slate-900/95 border-2 rounded-3xl p-5 sm:p-8 shadow-2xl glow-p2";
+                winnerAvatar.className = "w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-400 flex items-center justify-center text-2xl";
+            }
+
+            document.getElementById("quiz-winner-name").textContent = winnerName;
+            document.getElementById("quiz-bab-badge").textContent = qData.bab;
+            document.getElementById("quiz-progress-text").textContent = `Soalan ${gameState.currentQuestionIndex + 1} daripada ${biologyQuestions.length}`;
+            document.getElementById("quiz-question-text").textContent = qData.question;
+
+            // Sembunyikan kotak maklum balas dan butang seterusnya
+            document.getElementById("quiz-feedback-box").classList.add("hidden");
+            document.getElementById("btn-next-round").classList.add("hidden");
+
+            // Jana butang pilihan A, B, C, D
+            const optionsGrid = document.getElementById("quiz-options-grid");
+            optionsGrid.innerHTML = "";
+            const letters = ["A", "B", "C", "D"];
+
+            qData.options.forEach((optText, idx) => {
+                const btn = document.createElement("button");
+                btn.className = "option-btn btn-game text-left bg-slate-800/90 hover:bg-slate-700 border border-slate-600/80 rounded-2xl p-4 flex items-start gap-3.5 transition";
+                btn.innerHTML = `
+                    <span class="shrink-0 w-8 h-8 rounded-xl bg-slate-900 border border-slate-600 flex items-center justify-center font-game font-bold text-sm text-emerald-300">
+                        ${letters[idx]}
+                    </span>
+                    <span class="text-sm sm:text-base font-medium text-slate-100 leading-snug pt-0.5">${optText}</span>
+                `;
+                btn.onclick = () => submitAnswer(idx, btn);
+                optionsGrid.appendChild(btn);
+            });
+
+            switchScreen("screen-quiz");
+            startQuizTimer();
+        }
+
+        function startQuizTimer() {
+            clearInterval(gameState.quizTimerInterval);
+            const timerEl = document.getElementById("quiz-timer");
+            timerEl.textContent = `${gameState.timeLeft}s`;
+            timerEl.className = "font-game text-2xl font-extrabold text-amber-400";
+
+            gameState.quizTimerInterval = setInterval(() => {
+                if (gameState.questionAnswered) {
+                    clearInterval(gameState.quizTimerInterval);
+                    return;
+                }
+
+                gameState.timeLeft--;
+                timerEl.textContent = `${gameState.timeLeft}s`;
+
+                if (gameState.timeLeft <= 20) {
+                    timerEl.className = "font-game text-2xl font-extrabold text-rose-500 animate-pulse";
+                }
+
+                if (gameState.timeLeft <= 0) {
+                    clearInterval(gameState.quizTimerInterval);
+                    handleTimeUp();
+                }
+            }, 1000);
+        }
+
+        function handleTimeUp() {
+            if (gameState.questionAnswered) return;
+            gameState.questionAnswered = true;
+            playWrongSound();
+
+            const qData = biologyQuestions[gameState.currentQuestionIndex];
+            highlightCorrectOption(qData.answer);
+
+            const fbBox = document.getElementById("quiz-feedback-box");
+            fbBox.className = "rounded-2xl p-4 border mb-4 bg-rose-950/60 border-rose-500/60 text-rose-100";
+            fbBox.classList.remove("hidden");
+
+            document.getElementById("feedback-title").textContent = "⏰ Masa Tamat (120 Saat)!";
+            document.getElementById("feedback-explanation").textContent = `Jawapan tepat ialah: ${qData.options[qData.answer]}. ${qData.explanation}`;
+            document.getElementById("btn-next-round").classList.remove("hidden");
+        }
+
+        function submitAnswer(selectedIndex, selectedBtn) {
+            if (gameState.questionAnswered) return;
+            gameState.questionAnswered = true;
+            clearInterval(gameState.quizTimerInterval);
+
+            const qData = biologyQuestions[gameState.currentQuestionIndex];
+            const isCorrect = selectedIndex === qData.answer;
+            const winnerName = gameState.roundWinner === 1 ? gameState.p1Name : gameState.p2Name;
+
+            // Nyahaktifkan semua butang pilihan
+            document.querySelectorAll(".option-btn").forEach(b => {
+                b.disabled = true;
+                b.classList.remove("hover:bg-slate-700");
+            });
+
+            const fbBox = document.getElementById("quiz-feedback-box");
+            fbBox.classList.remove("hidden");
+
+            if (isCorrect) {
+                // Tambah 10 markah kepada pemenang pusingan
+                if (gameState.roundWinner === 1) {
+                    gameState.p1Score += 10;
+                } else {
+                    gameState.p2Score += 10;
+                }
+                updateScoreUI();
+
+                selectedBtn.className = "option-btn text-left bg-emerald-600/40 border-2 border-emerald-400 rounded-2xl p-4 flex items-start gap-3.5";
+                fbBox.className = "rounded-2xl p-4 border mb-4 bg-emerald-950/70 border-emerald-500/60 text-emerald-100";
+                document.getElementById("feedback-title").textContent = `🎉 Tahniah ${winnerName}! Jawapan Betul (+10 Markah)`;
+                document.getElementById("feedback-explanation").textContent = qData.explanation;
+
+                // Mainkan muzik latar belakang ceria selama 5 saat
+                playCheerfulMusic5Seconds();
+            } else {
+                selectedBtn.className = "option-btn text-left bg-rose-600/40 border-2 border-rose-400 rounded-2xl p-4 flex items-start gap-3.5";
+                highlightCorrectOption(qData.answer);
+
+                fbBox.className = "rounded-2xl p-4 border mb-4 bg-rose-950/70 border-rose-500/60 text-rose-100";
+                document.getElementById("feedback-title").textContent = `❌ Kurang Tepat, ${winnerName}!`;
+                document.getElementById("feedback-explanation").textContent = qData.explanation;
+
+                playWrongSound();
+            }
+
+            const nextBtn = document.getElementById("btn-next-round");
+            nextBtn.textContent = (gameState.currentQuestionIndex + 1 >= biologyQuestions.length)
+                ? "Lihat Keputusan Akhir 🏆"
+                : "Pusingan Seterusnya ➡️";
+            nextBtn.classList.remove("hidden");
+        }
+
+        function highlightCorrectOption(correctIndex) {
+            const buttons = document.querySelectorAll(".option-btn");
+            if (buttons[correctIndex]) {
+                buttons[correctIndex].className = "option-btn text-left bg-emerald-600/35 border-2 border-emerald-400 rounded-2xl p-4 flex items-start gap-3.5";
+            }
+        }
+
+        function proceedAfterQuiz() {
+            stopCheerfulMusic();
+            gameState.currentQuestionIndex++;
+
+            if (gameState.currentQuestionIndex >= biologyQuestions.length) {
+                showFinalResults();
+            } else {
+                switchScreen("screen-rps");
+                prepareRPSRound();
+            }
+        }
+
+        /**
+         * ============================================================================
+         * 7. KEPUTUSAN AKHIR & UTILITI ANTARA MUKA
+         * ============================================================================
+         */
+        function showFinalResults() {
+            switchScreen("screen-gameover");
+
+            document.getElementById("final-p1-name").textContent = gameState.p1Name;
+            document.getElementById("final-p2-name").textContent = gameState.p2Name;
+            document.getElementById("final-p1-score").textContent = gameState.p1Score;
+            document.getElementById("final-p2-score").textContent = gameState.p2Score;
+
+            const annEl = document.getElementById("final-winner-announcement");
+            if (gameState.p1Score > gameState.p2Score) {
+                annEl.textContent = `🏆 Juara Keseluruhan ialah ${gameState.p1Name} dengan ${gameState.p1Score} markah!`;
+                announceWinnerVoice(gameState.p1Name);
+                playCheerfulMusic5Seconds();
+            } else if (gameState.p2Score > gameState.p1Score) {
+                annEl.textContent = `🏆 Juara Keseluruhan ialah ${gameState.p2Name} dengan ${gameState.p2Score} markah!`;
+                announceWinnerVoice(gameState.p2Name);
+                playCheerfulMusic5Seconds();
+            } else {
+                annEl.textContent = `🤝 Keputusan Seri! Kedua-dua pemain memperoleh ${gameState.p1Score} markah!`;
+                playCheerfulMusic5Seconds();
+            }
+        }
+
+        function resetFullGame() {
+            stopCheerfulMusic();
+            clearInterval(gameState.quizTimerInterval);
+            gameState.p1Score = 0;
+            gameState.p2Score = 0;
+            gameState.currentQuestionIndex = 0;
+            updateScoreUI();
+            switchScreen("screen-setup");
+        }
+
+        function updateScoreUI() {
+            document.getElementById("header-p1-score").textContent = gameState.p1Score;
+            document.getElementById("header-p2-score").textContent = gameState.p2Score;
+        }
+
+        function switchScreen(screenId) {
+            ["screen-setup", "screen-rps", "screen-quiz", "screen-gameover"].forEach(id => {
+                document.getElementById(id).classList.add("hidden");
+            });
+            document.getElementById(screenId).classList.remove("hidden");
+        }
+
+        let toastTimeout = null;
+        function showToast(msg) {
+            const toast = document.getElementById("toast-box");
+            toast.textContent = msg;
+            toast.classList.remove("hidden");
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.add("hidden");
+            }, 3000);
+        }
+
+        // Muatkan senarai suara awal untuk Web Speech API
+        window.onload = () => {
+            if ("speechSynthesis" in window) {
+                window.speechSynthesis.getVoices();
+            }
+        };
+    </script>
+</body>
+</html>
